@@ -1,0 +1,426 @@
+#                                               P-v-P Game
+
+
+
+#-----------------------------------------------------------------------|   IMPORTS
+from ast import Break
+from glob import glob
+import pygame
+from pygame import mixer
+pygame.init()
+pygame.font.init()
+
+
+#-----------------------------------------------------------------------|   VARIABLES
+
+#           MAIN SCREEN
+screenX = 1080
+screenY = 720
+window = pygame.display.set_mode((screenX, screenY))
+border = pygame.Rect(screenX//2 , 0, 10, screenY)
+pygame.display.set_caption("PvP Battle")
+bg_img = pygame.image.load("PvP_bg.jpg")
+
+
+
+#           RED PLAYER VARIBLES
+red_ufo = pygame.image.load("R-S.png")
+red_ship_X, red_ship_Y = 120, 100
+red_misile_img = pygame.image.load("R-M.png")
+misile_state = 'ready'
+R_misileX = 0
+R_misileY = 0
+vel_red = 7
+r_max_misile = 2
+r_missile_vel = 18
+
+#           BLUE PLAYER VARIABLES
+blue_ufo = pygame.image.load("B-S.png")
+blue_ship_X, blue_ship_Y = 120, 100
+blue_misile_img = pygame.image.load("B-M.png")
+b_m_state = 'ready'
+B_misileX = 0
+B_misileY = 0
+vel_blue = 10  
+b_max_misile = 2
+b_missile_vel = 22
+
+
+#           EVENTS
+red_hit = pygame.USEREVENT + 1
+blue_hit = pygame.USEREVENT + 2
+misile_hit_red = pygame.USEREVENT + 3
+misile_hit_blue = pygame.USEREVENT + 4
+r_hp_gain = pygame.USEREVENT + 5
+b_hp_gain = pygame.USEREVENT + 6
+
+
+#           SOUNDS
+mixer.music.load("SW- Battle of the Heroes(2).wav")                    # background music
+mixer.music.play(-1)
+
+hit_sound =  mixer.Sound("bullet_impact.wav")
+red_bullet_sound =  mixer.Sound("red_bullet_sound.wav")
+blue_bullet_sound =  mixer.Sound("blue_bullet_sound.wav")
+red_misile_sound = mixer.Sound("red_missile_launch.wav")
+blue_misile_sound = mixer.Sound("blue_missile_launch.wav")
+power_up_sound = mixer.Sound("power-up_sound.wav")
+misile_impact_sound = mixer.Sound("missile_impact.wav")
+
+
+#           FONTS
+HP_font = pygame.font.SysFont("comicsabs", 40)
+winner_font = pygame.font.SysFont("comicsabs", 100)
+
+
+
+#           COLORS
+color_white = (255,255,255)
+ 
+
+
+#           MISC
+fps = 60
+bullet_vel = 30
+max_bullet = 3
+bulletX = 0
+bulletY = 0
+bullet_state = 0
+win_text = ""
+explosion_img = pygame.image.load("missile_impact_img(4).png")
+r_max_hp_gain = 2
+b_max_hp_gain = 1
+
+
+
+#-----------------------------------------------------------| FUNCTIONS
+                                          
+
+
+
+
+def draw_winner(win_text):
+    
+    if win_text is 'BLUE WINS':
+        draw_text = winner_font.render(win_text, 1, (0,0,255))
+        window.blit(draw_text, (350, 300))
+        pygame.display.update()
+        #pygame.time.delay(50000)
+
+    if win_text is 'RED WINS':
+        draw_text = winner_font.render(win_text, 1, (255,0,0))
+        window.blit(draw_text, (350, 300))
+        pygame.display.update()
+        #pygame.time.delay(50000)
+
+
+
+
+def draw_window(red, blue, red_bullets, blue_bullets, blue_HP, red_HP, blue_misiles):
+    global b_m_state
+    #window.fill((0,0,0))
+    window.blit(bg_img, (0,0))
+
+    pygame.draw.rect(window, color_white, border)
+#                                                                                                               RESIZE IMAGE IN CODE
+#       new variable = pygame.transform.scale      (old variable,        (width, height)   rotat-angle)
+#       blue_ufo     = pygame.transform.scale      (blue_ufo(2),         (32,        32))             )
+    
+    red_HP_text = HP_font.render("HP: " +  str(red_HP), 1, (255,255,255))
+    blue_HP_text = HP_font.render("HP: " +  str(blue_HP), 1, (255,255,255))
+    window.blit(red_HP_text, (10,10))
+    window.blit(blue_HP_text, (980,10))
+
+
+    window.blit(blue_ufo, (blue.x, blue.y-30))
+    window.blit(red_ufo, (red.x, red.y-30))
+    
+
+    for bullet in red_bullets:
+        pygame.draw.rect(window, (255, 0, 0), bullet )
+
+    for bullet in blue_bullets:
+        pygame.draw.rect(window, (0, 0, 255), bullet ) 
+
+    
+    if b_m_state == 'fire':
+        window.blit(blue_misile_img, (blue.x, blue.y))
+        b_m_state = 'firing'
+
+
+    
+    pygame.display.update
+
+
+
+
+def red_move(keys_pressed, red):
+
+    if keys_pressed[pygame.K_a] and red.x -vel_red > 0 :   #left
+            red.x -= vel_red
+    if keys_pressed[pygame.K_d] and red.x +vel_red < screenX/2 -100 :    #rightt
+            red.x += vel_red
+    if keys_pressed[pygame.K_w] and red.y -vel_red > 0 :    #up
+            red.y -= vel_red
+    if keys_pressed[pygame.K_s] and red.y +vel_red < 660 :    #down
+            red.y += vel_red
+
+
+
+
+def blue_move(keys_pressed, blue):
+
+    if keys_pressed[pygame.K_LEFT] and blue.x -vel_blue > screenX/2 +10  :   #left
+            blue.x -= vel_blue
+    if keys_pressed[pygame.K_RIGHT] and blue.x +vel_blue < 950:    #right
+            blue.x += vel_blue
+    if keys_pressed[pygame.K_UP]and blue.y -vel_blue > 0 :    #up
+            blue.y -= vel_blue
+    if keys_pressed[pygame.K_DOWN]and blue.y +vel_blue < 660 :    #down
+            blue.y += vel_blue
+
+
+
+
+def handle_bullets(blue_bullets, red_bullets, blue, red, blue_misile_rect, blue_misiles):
+    global bullet_state
+    
+
+    for bullet in red_bullets:
+        bullet.x += bullet_vel
+        if blue.colliderect(bullet):
+            pygame.event.post(pygame.event.Event(blue_hit))
+            red_bullets.remove(bullet)
+        elif bullet.x > screenX:
+            red_bullets.remove(bullet)    
+
+    for bullet in blue_bullets:
+        bullet.x -= bullet_vel
+        if red.colliderect(bullet):
+            pygame.event.post(pygame.event.Event(red_hit))
+            
+            blue_bullets.remove(bullet)
+        elif bullet.x < 0:
+            blue_bullets.remove(bullet)
+
+    
+
+    
+def red_misile (x,y):
+    global misile_state
+    misile_state = 'fire'
+    window.blit(red_misile_img, (x+80, y+5))
+
+
+
+
+def fire_blue_misile(x,y,):
+    if b_m_state == 'firing':
+        window.blit(blue_misile_img, (x-32, y+25))
+
+        
+
+
+
+
+
+
+def main():
+#   GLOBALS
+    global r_missile_vel
+    global b_missile_vel 
+    global b_max_hp_gain
+    global r_max_hp_gain
+    global b_m_state
+    global B_misileX 
+    global B_misileY
+    global R_misileX
+    global R_misileY
+    global misile_state
+    global bulletX
+    global win_text
+    global r_max_misile
+    global b_max_misile
+
+    red_HP = 10
+    blue_HP = 10
+
+
+    blue_misiles = []
+
+    
+
+    blue = pygame.Rect( 950, 330, blue_ship_X, 60)
+    red = pygame.Rect( 35, 330, red_ship_X, 60)
+    blue_bullets = []
+    red_bullets = []
+
+    blue_misile_rect = pygame.Rect(blue.x, blue.y+32, 80, 30)
+    red_misile_rect = pygame.Rect(red.x, red.y, 80,30)
+
+
+    clock = pygame.time.Clock()
+
+
+
+
+#------------------------------------------------| GAME LOOP |---------------------------------------------------------------------------------------------------------------------------------------------------
+    running = True
+    while running:
+        clock.tick(fps)
+
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                running = False
+                pygame.quit()
+                
+
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_LCTRL and len(red_bullets) < max_bullet:
+                    bullet = pygame.Rect(red.x + 90, red.y +20 , 10, 5)
+                    red_bullets.append(bullet)
+                    red_bullet_sound.play()
+                
+                if event.key == pygame.K_RCTRL and len(blue_bullets) < max_bullet:
+                    bullet = pygame.Rect(blue.x, blue.y+32, 10, 5)
+                    blue_bullets.append(bullet)
+                    blue_bullet_sound.play()
+                
+                if event.key == pygame.K_LSHIFT and r_max_misile > 0:
+                    r_max_misile -= 1
+                    if misile_state is 'empty':
+                        pass
+                    elif misile_state is 'ready':
+                        red_misile_sound.play()                        
+                        R_misileX = red.x
+                        R_misileY = red.y
+                        red_misile(R_misileX, R_misileY)
+                        red_misile_rect = pygame.Rect(R_misileX, R_misileY, 32,32)
+                        
+                if event.key == pygame.K_RSHIFT and b_max_misile != 0:
+                    b_max_misile -= 1  
+                    if b_m_state == 'ready':
+                        blue_misile_sound.play()                            
+                        B_misileX = blue.x
+                        B_misileY = blue.y
+                        b_m_state = 'fire'
+                        blue_misile_rect = pygame.Rect(B_misileX, B_misileY+32, 32, 32) 
+                        
+                        blue_misiles.append(blue_misile_rect)
+
+                if event.key == pygame.K_KP0 and b_max_hp_gain != 0 and blue_HP < 8:                    
+                    pygame.event.post(pygame.event.Event(b_hp_gain))
+                    b_max_hp_gain -= 1 
+
+                if event.key == pygame.K_q and r_max_hp_gain != 0 and red_HP < 8:                   
+                    pygame.event.post(pygame.event.Event(r_hp_gain))
+                    r_max_hp_gain -= 1
+
+
+#       CHECKING FOR EVENTS
+            if event.type == blue_hit:
+                blue_HP -= 1
+                hit_sound.play()
+
+            if event.type == red_hit:
+                red_HP -=1
+                hit_sound.play()
+
+            if event.type == misile_hit_red:
+                misile_impact_sound.play()
+                red_HP -=3
+
+            if event.type == misile_hit_blue:
+                misile_impact_sound.play()
+                blue_HP -=3    
+            
+            if event.type == r_hp_gain:
+                power_up_sound.play()
+                red_HP += 2
+
+            if event.type == b_hp_gain:  
+                power_up_sound.play() 
+                blue_HP += 2
+
+
+
+
+#       CHECKING HEALTH OF RED AND BLUE 
+        if red_HP <= 0:
+            win_text = "BLUE WINS"
+            
+        if blue_HP <= 0:
+            win_text = "RED WINS"
+
+        if win_text != "":
+            draw_winner(win_text)  
+            break
+
+
+#       CALLING FUNCTION FOR PLAYER MOVEMENT               
+        keys_pressed = pygame.key.get_pressed()
+        red_move(keys_pressed, red)
+        blue_move(keys_pressed, blue)
+
+
+
+        
+        draw_window(red, blue, red_bullets, blue_bullets, blue_HP, red_HP, blue_misiles)
+        handle_bullets(blue_bullets, red_bullets, blue, red, blue_misile_rect, blue_misiles)
+
+
+#--------- FIRING RED MISILES
+    
+        
+
+        if R_misileX > 1000:
+            R_misileY = 9999
+            misile_state = "ready"
+
+        if misile_state is 'fire':
+            red_misile(R_misileX, R_misileY)
+            R_misileX += r_missile_vel
+            red_misile_rect.x += r_missile_vel
+            if red_misile_rect.colliderect(blue):
+                window.blit(explosion_img, (R_misileX, R_misileY-15))
+                pygame.event.post(pygame.event.Event(misile_hit_blue))
+                R_misileX = 11111
+
+        elif misile_state is 'empty':
+            pass  
+        
+        
+#------- FIRING BLUE MISILES
+        if b_m_state == 'firing' and b_m_state!= 'empty':
+            fire_blue_misile(B_misileX, B_misileY)
+            B_misileX -= b_missile_vel
+            blue_misile_rect.x -= b_missile_vel
+
+            if blue_misile_rect.colliderect(red):
+                b_m_state = 'ready'
+                window.blit(explosion_img, (B_misileX-160, B_misileY-25))
+                pygame.event.post(pygame.event.Event(misile_hit_red))
+                B_misileX = 99999
+        else:
+            pass
+
+                
+            
+            
+
+
+        pygame.display.update()
+
+
+    main()
+    
+
+
+
+
+
+#---------------------------------------------------------------| MAIN
+
+
+if __name__ == "__main__":
+    main()
